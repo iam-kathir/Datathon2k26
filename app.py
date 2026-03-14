@@ -1,1 +1,1 @@
-print("Datathon 2026 started! by sarmi")
+print("Datathon 2026 started! by sarmita")
