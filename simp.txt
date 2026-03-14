@@ -1,0 +1,796 @@
+import streamlit as st
+import pandas as pd
+import time
+import random
+
+# ─── PAGE CONFIG ────────────────────────────────────────────────
+st.set_page_config(
+    page_title="Healthcare Compliance Agent",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ─── GLOBAL CSS ─────────────────────────────────────────────────
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'DM Sans', sans-serif;
+}
+
+/* Hide default streamlit chrome */
+#MainMenu, footer, header { visibility: hidden; }
+.block-container { padding: 1.5rem 2rem 2rem 2rem; max-width: 1400px; }
+
+/* Sidebar */
+[data-testid="stSidebar"] {
+    background: #0A1628;
+    border-right: 1px solid #1A2E4A;
+}
+[data-testid="stSidebar"] * { color: #94A3B8 !important; }
+[data-testid="stSidebar"] .sidebar-brand { color: #38BDF8 !important; }
+
+/* Metric cards */
+.metric-card {
+    background: #0F172A;
+    border: 1px solid #1E293B;
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem;
+    text-align: center;
+}
+.metric-val {
+    font-size: 2rem;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 2px;
+}
+.metric-lbl {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748B;
+}
+
+/* Agent cards */
+.agent-card {
+    background: #0F172A;
+    border-radius: 14px;
+    padding: 1.4rem;
+    border: 1px solid #1E293B;
+    height: 100%;
+}
+.agent-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+}
+.agent-role {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+}
+.agent-item {
+    background: #1E293B;
+    border-radius: 8px;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.82rem;
+    color: #CBD5E1;
+    margin-bottom: 0.45rem;
+    border-left: 3px solid;
+}
+
+/* Risk badges */
+.badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+}
+.badge-high   { background: #450A0A; color: #FCA5A5; border: 1px solid #7F1D1D; }
+.badge-medium { background: #451A03; color: #FCD34D; border: 1px solid #78350F; }
+.badge-low    { background: #052E16; color: #86EFAC; border: 1px solid #14532D; }
+.badge-denied { background: #450A0A; color: #FCA5A5; border: 1px solid #7F1D1D; }
+.badge-approved { background: #052E16; color: #86EFAC; border: 1px solid #14532D; }
+
+/* Section headers */
+.section-header {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #38BDF8;
+    margin-bottom: 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid #1E293B;
+}
+
+/* Timeline steps */
+.timeline-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 1px solid #1E293B;
+}
+
+/* Fix output box */
+.fix-box {
+    background: #0A2818;
+    border: 1px solid #166534;
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    font-size: 0.85rem;
+    color: #BBF7D0;
+    font-family: 'DM Mono', monospace;
+    line-height: 1.8;
+}
+
+/* Claim row */
+.claim-row {
+    background: #0F172A;
+    border: 1px solid #1E293B;
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+/* Divider */
+.hdivider {
+    border: none;
+    border-top: 1px solid #1E293B;
+    margin: 1.2rem 0;
+}
+
+/* Tab styling override */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 0;
+    background: #0A1628;
+    border-radius: 10px;
+    padding: 4px;
+    border: 1px solid #1E293B;
+}
+.stTabs [data-baseweb="tab"] {
+    background: transparent;
+    border-radius: 7px;
+    color: #64748B;
+    font-weight: 500;
+    font-size: 0.85rem;
+    padding: 8px 20px;
+}
+.stTabs [aria-selected="true"] {
+    background: #1E3A5F !important;
+    color: #38BDF8 !important;
+}
+
+/* Button */
+.stButton > button {
+    background: #1A56DB;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.4rem;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.2s;
+}
+.stButton > button:hover {
+    background: #1D4ED8;
+    border: none;
+}
+
+/* Scrollable table */
+.scrolltable { overflow-x: auto; }
+
+/* Dark theme override */
+.main { background: #060D1A; }
+</style>
+""", unsafe_allow_html=True)
+
+# ─── SAMPLE DATA (from your real dataset) ──────────────────────
+SAMPLE_POLICIES = [
+    {
+        "id": "POL-2024-001",
+        "title": "CMS Update LCD – Q3 2023",
+        "type": "LCD",
+        "body": "CMS Transmittal 11271 — Effective January 1 2024, claims for HCPCS G0438 and G0439 must include documentation of a cognitive impairment assessment using a validated screening tool. Claims submitted without this documentation will be automatically returned to provider.",
+        "codes": ["G0438", "G0439"],
+        "effective": "2024-01-01",
+        "impact": "HIGH",
+        "action": "Documentation requirements tightened",
+        "issuer": "CMS HQ",
+        "deadline_days": 30,
+        "financial_impact": 8366
+    },
+    {
+        "id": "POL-2024-002",
+        "title": "CMS Update Fee Schedule – Q1 2024",
+        "type": "Fee Schedule Update",
+        "body": "Pursuant to the Physician Fee Schedule Final Rule for CY 2024, reimbursement rates for CPT 99213 and 99214 are revised. The conversion factor is adjusted from $33.89 to $32.74. Providers billing these codes after January 1 2024 will receive updated payment amounts.",
+        "codes": ["99213", "99214"],
+        "effective": "2024-01-01",
+        "impact": "MEDIUM",
+        "action": "Reimbursement rate reduced",
+        "issuer": "HHS",
+        "deadline_days": 60,
+        "financial_impact": 4200
+    },
+    {
+        "id": "POL-2024-003",
+        "title": "CMS Prior Auth – Q2 2024",
+        "type": "Prior Auth Requirement",
+        "body": "Effective April 1 2024, prior authorization is required for CPT 80053 (Comprehensive Metabolic Panel) when billed by outpatient facilities under Medicare Part B. Claims submitted without an approved prior authorization number will be denied under LCD L37515.",
+        "codes": ["80053"],
+        "effective": "2024-04-01",
+        "impact": "HIGH",
+        "action": "Prior auth now required",
+        "issuer": "OIG",
+        "deadline_days": 30,
+        "financial_impact": 6150
+    }
+]
+
+SAMPLE_CLAIMS = [
+    {"claim_id": "CLM000001", "patient_id": "PAT98696", "provider": "Dr. Emily Davis",
+     "cpt_code": "G0439", "icd10": "I10", "payer": "Cigna",
+     "billed": 1024.19, "status": "DENIED", "denial_reason": "Missing prior authorization",
+     "prior_auth_req": "Y", "doc_required": "N", "risk": "HIGH", "compliance": 88.6},
+    {"claim_id": "CLM000003", "patient_id": "PAT23396", "provider": "Dr. Sarah Johnson",
+     "cpt_code": "80053", "icd10": "M54.5", "payer": "Medicare Part B",
+     "billed": 1616.45, "status": "DENIED", "denial_reason": "Service not covered",
+     "prior_auth_req": "N", "doc_required": "N", "risk": "HIGH", "compliance": 79.2},
+    {"claim_id": "CLM000004", "patient_id": "PAT92397", "provider": "Dr. Emily Davis",
+     "cpt_code": "G0438", "icd10": "I10", "payer": "Blue Cross Blue Shield",
+     "billed": 3964.14, "status": "APPROVED", "denial_reason": "N/A",
+     "prior_auth_req": "N", "doc_required": "N", "risk": "MEDIUM", "compliance": 88.6},
+    {"claim_id": "CLM000012", "patient_id": "PAT11234", "provider": "Dr. Robert Chen",
+     "cpt_code": "99214", "icd10": "Z79.899", "payer": "Aetna",
+     "billed": 316.11, "status": "APPROVED", "denial_reason": "N/A",
+     "prior_auth_req": "N", "doc_required": "Y", "risk": "MEDIUM", "compliance": 72.7},
+    {"claim_id": "CLM000018", "patient_id": "PAT55678", "provider": "Dr. Priya Patel",
+     "cpt_code": "80053", "icd10": "E11.9", "payer": "Humana",
+     "billed": 892.30, "status": "APPROVED", "denial_reason": "N/A",
+     "prior_auth_req": "N", "doc_required": "N", "risk": "HIGH", "compliance": 77.8},
+    {"claim_id": "CLM000025", "patient_id": "PAT77890", "provider": "Dr. Michael Lee",
+     "cpt_code": "99213", "icd10": "J06.9", "payer": "Medicaid",
+     "billed": 245.00, "status": "DENIED", "denial_reason": "Incorrect billing code",
+     "prior_auth_req": "N", "doc_required": "N", "risk": "LOW", "compliance": 91.1},
+]
+
+FIXER_OUTPUTS = {
+    "CLM000001": [
+        "Obtain signed cognitive assessment form (Mini-Cog or MMSE) from Dr. Emily Davis",
+        "Attach form as addendum to patient PAT98696 medical record dated 2024-10-16",
+        "Submit prior authorization request to Cigna with cognitive assessment evidence",
+        "Resubmit claim CLM000001 with modifier -25 and complete documentation",
+        "Update G0439 billing template — add cognitive assessment as mandatory field",
+        "Deadline: resubmit within 30 days of original denial date"
+    ],
+    "CLM000003": [
+        "Verify medical necessity for CPT 80053 given diagnosis M54.5 (low back pain)",
+        "Obtain physician attestation linking metabolic panel to active treatment plan",
+        "Submit prior authorization to Medicare Part B before resubmission",
+        "Recode if appropriate — consider 80048 (Basic Metabolic Panel) as alternative",
+        "Deadline: 60 days from service date 2023-06-13"
+    ],
+    "CLM000018": [
+        "Submit prior authorization request to Humana for CPT 80053",
+        "Include clinical notes supporting medical necessity for patient PAT55678",
+        "Do NOT submit claim until prior auth number is obtained and confirmed",
+        "Once auth received, resubmit with auth number in field 23 of CMS-1500",
+        "Deadline: authorization must be obtained before April 1 2024 effective date"
+    ]
+}
+
+# ─── SESSION STATE INIT ─────────────────────────────────────────
+if "watcher_done"  not in st.session_state: st.session_state.watcher_done  = False
+if "thinker_done"  not in st.session_state: st.session_state.thinker_done  = False
+if "selected_pol"  not in st.session_state: st.session_state.selected_pol  = None
+if "selected_claim" not in st.session_state: st.session_state.selected_claim = None
+if "fixer_done"    not in st.session_state: st.session_state.fixer_done    = False
+
+# ─── SIDEBAR ────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown("""
+    <div style='padding: 1rem 0 0.5rem 0;'>
+        <div style='font-size:1.15rem; font-weight:700; color:#38BDF8; letter-spacing:-0.01em;'>
+            HealthGuard AI
+        </div>
+        <div style='font-size:0.72rem; color:#475569; text-transform:uppercase;
+                    letter-spacing:0.1em; margin-top:2px;'>
+            Compliance Agent v1.0
+        </div>
+    </div>
+    <hr style='border-color:#1E293B; margin:0.8rem 0;'>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='font-size:0.7rem;color:#475569;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;'>Dataset</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='background:#0F172A;border-radius:8px;padding:0.7rem 0.9rem;border:1px solid #1E293B;margin-bottom:1rem;'>
+        <div style='color:#CBD5E1;font-size:0.82rem;'>MASTER_healthcare_compliance</div>
+        <div style='color:#475569;font-size:0.72rem;margin-top:2px;'>2,000 claims · 35 columns</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("<div style='font-size:0.7rem;color:#475569;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;'>Agent status</div>", unsafe_allow_html=True)
+
+    def status_dot(done): return ("🟢", "#22C55E", "Active") if done else ("⚪", "#475569", "Standby")
+
+    for agent, done in [("Watcher", st.session_state.watcher_done),
+                         ("Thinker", st.session_state.thinker_done),
+                         ("Fixer",   st.session_state.fixer_done)]:
+        icon, col, label = status_dot(done)
+        st.markdown(f"""
+        <div style='display:flex;align-items:center;gap:8px;padding:5px 0;
+                    border-bottom:1px solid #1E293B;'>
+            <span style='font-size:0.6rem;color:{col};'>●</span>
+            <span style='color:#94A3B8;font-size:0.83rem;flex:1;'>{agent}</span>
+            <span style='color:{col};font-size:0.72rem;'>{label}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("<hr style='border-color:#1E293B;margin:1rem 0;'>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:0.7rem;color:#475569;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;'>AI Stack</div>", unsafe_allow_html=True)
+    for item in [("Claude API", "Anthropic", "#38BDF8"), ("XGBoost", "Risk Scorer", "#F59E0B"), ("pdfplumber", "PDF Parser", "#A78BFA")]:
+        st.markdown(f"""
+        <div style='display:flex;justify-content:space-between;align-items:center;
+                    padding:4px 0;border-bottom:1px solid #1E293B;'>
+            <span style='color:{item[2]};font-size:0.8rem;font-weight:500;'>{item[0]}</span>
+            <span style='color:#475569;font-size:0.72rem;'>{item[1]}</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if st.button("Reset all agents", use_container_width=True):
+        for k in ["watcher_done","thinker_done","fixer_done","selected_pol","selected_claim"]:
+            st.session_state[k] = False if k != "selected_pol" and k != "selected_claim" else None
+        st.rerun()
+
+# ─── MAIN HEADER ────────────────────────────────────────────────
+st.markdown("""
+<div style='margin-bottom:1.5rem;'>
+    <div style='font-size:1.6rem;font-weight:700;color:#F1F5F9;letter-spacing:-0.02em;'>
+        Healthcare Compliance Agent
+    </div>
+    <div style='font-size:0.88rem;color:#64748B;margin-top:3px;'>
+        Autonomous policy monitoring · AI-powered claim analysis · Corrective action generation
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ─── TOP METRICS ROW ────────────────────────────────────────────
+c1, c2, c3, c4, c5 = st.columns(5)
+metrics = [
+    ("2,000",  "Total Claims",        "#38BDF8"),
+    ("515",    "Denied Claims",       "#F87171"),
+    ("26%",    "Rejection Rate",      "#FBBF24"),
+    ("401",    "High Risk Policies",  "#F87171"),
+    ("$8,366", "Revenue at Risk",     "#34D399"),
+]
+for col, (val, lbl, color) in zip([c1,c2,c3,c4,c5], metrics):
+    col.markdown(f"""
+    <div class='metric-card'>
+        <div class='metric-val' style='color:{color};'>{val}</div>
+        <div class='metric-lbl'>{lbl}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("<div style='height:1.2rem;'></div>", unsafe_allow_html=True)
+
+# ─── TABS ───────────────────────────────────────────────────────
+tab1, tab2, tab3 = st.tabs([
+    "  Agent 1 — Watcher  ",
+    "  Agent 2 — Thinker  ",
+    "  Agent 3 — Fixer    "
+])
+
+# ════════════════════════════════════════════════════════════════
+# TAB 1 — WATCHER
+# ════════════════════════════════════════════════════════════════
+with tab1:
+    col_left, col_right = st.columns([1.1, 1], gap="large")
+
+    with col_left:
+        st.markdown("<div class='section-header'>Monitor CMS Portal</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:0.83rem;color:#64748B;margin-bottom:1rem;line-height:1.6;'>
+            Paste a CMS portal URL. The Watcher downloads the policy document, sends the
+            raw text to Claude AI, and extracts structured compliance data from unstructured legal language.
+        </div>
+        """, unsafe_allow_html=True)
+
+        url = st.text_input(
+            "CMS Portal URL",
+            value="https://www.cms.gov/medicare/coding-billing/healthcare-common-procedure-system/quarterly-update",
+            label_visibility="collapsed",
+            placeholder="Paste CMS URL here..."
+        )
+
+        col_btn1, col_btn2 = st.columns([1,2])
+        with col_btn1:
+            scan_btn = st.button("Scan for changes", use_container_width=True)
+
+        if scan_btn:
+            with st.spinner(""):
+                prog = st.progress(0)
+                steps = [
+                    ("Connecting to CMS portal...", 0.15),
+                    ("Downloading policy documents...", 0.35),
+                    ("Extracting text from PDFs...", 0.55),
+                    ("Sending to Claude AI...", 0.75),
+                    ("Claude reading legal language...", 0.9),
+                    ("Structuring policy changes...", 1.0),
+                ]
+                status_ph = st.empty()
+                for msg, pct in steps:
+                    status_ph.markdown(f"<div style='font-size:0.8rem;color:#38BDF8;font-family:DM Mono,monospace;'>{msg}</div>", unsafe_allow_html=True)
+                    prog.progress(pct)
+                    time.sleep(0.45)
+                status_ph.empty()
+                prog.empty()
+            st.session_state.watcher_done = True
+            st.rerun()
+
+        if st.session_state.watcher_done:
+            st.markdown("""
+            <div style='background:#0A2818;border:1px solid #166534;border-radius:8px;
+                        padding:0.7rem 1rem;font-size:0.8rem;color:#86EFAC;
+                        font-family:DM Mono,monospace;margin-top:0.5rem;'>
+                ✓ Scan complete — 3 policy changes detected
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.8rem;'></div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-header'>Claude AI — Policy Extraction</div>", unsafe_allow_html=True)
+
+            pol = SAMPLE_POLICIES[0]
+            st.markdown(f"""
+            <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                        padding:1rem 1.1rem;font-size:0.8rem;'>
+                <div style='color:#475569;font-family:DM Mono,monospace;font-size:0.72rem;
+                            margin-bottom:0.5rem;'>CLAUDE INPUT — raw policy text excerpt</div>
+                <div style='color:#94A3B8;line-height:1.6;font-style:italic;border-left:2px solid #1E3A5F;
+                            padding-left:0.7rem;'>
+                    "{pol['body'][:180]}..."
+                </div>
+                <div style='color:#475569;font-family:DM Mono,monospace;font-size:0.72rem;
+                            margin:0.8rem 0 0.4rem 0;'>CLAUDE OUTPUT — structured extraction</div>
+                <div style='color:#38BDF8;font-family:DM Mono,monospace;font-size:0.76rem;line-height:1.8;'>
+                    affected_codes: ["G0438", "G0439"]<br>
+                    new_requirements: ["cognitive assessment form", "validated screening tool"]<br>
+                    denial_triggers: ["missing cognitive assessment documentation"]<br>
+                    effective_date: "2024-01-01"<br>
+                    financial_impact: "$8,366 at risk across pipeline"
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_right:
+        st.markdown("<div class='section-header'>Detected Policy Changes</div>", unsafe_allow_html=True)
+
+        if not st.session_state.watcher_done:
+            st.markdown("""
+            <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:10px;
+                        padding:2.5rem;text-align:center;color:#334155;'>
+                <div style='font-size:2rem;margin-bottom:0.5rem;'>◉</div>
+                <div style='font-size:0.85rem;'>Run the scan to detect policy changes</div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            for pol in SAMPLE_POLICIES:
+                impact_colors = {"HIGH": "#F87171", "MEDIUM": "#FBBF24", "LOW": "#34D399"}
+                badge_cls = {"HIGH": "badge-high", "MEDIUM": "badge-medium", "LOW": "badge-low"}
+                ic = impact_colors[pol["impact"]]
+
+                st.markdown(f"""
+                <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                            padding:1rem 1.1rem;margin-bottom:0.6rem;
+                            border-left:3px solid {ic};'>
+                    <div style='display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:0.5rem;'>
+                        <div style='font-size:0.88rem;font-weight:600;color:#E2E8F0;'>{pol["title"]}</div>
+                        <span class='badge {badge_cls[pol["impact"]]}'>{pol["impact"]}</span>
+                    </div>
+                    <div style='font-size:0.75rem;color:#64748B;margin-bottom:0.5rem;
+                                font-family:DM Mono,monospace;'>
+                        {pol["type"]} · Effective {pol["effective"]} · {pol["issuer"]}
+                    </div>
+                    <div style='font-size:0.78rem;color:#94A3B8;line-height:1.5;margin-bottom:0.6rem;'>
+                        {pol["action"]} — codes affected:
+                        {''.join(f"<span style='background:#1E293B;border-radius:4px;padding:1px 7px;font-family:DM Mono,monospace;font-size:0.72rem;color:#38BDF8;margin-left:4px;'>{c}</span>" for c in pol['codes'])}
+                    </div>
+                    <div style='display:flex;gap:1.5rem;font-size:0.75rem;color:#64748B;'>
+                        <span>⏱ Deadline: {pol["deadline_days"]} days</span>
+                        <span style='color:#F87171;'>💰 ${pol["financial_impact"]:,} at risk</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════
+# TAB 2 — THINKER
+# ════════════════════════════════════════════════════════════════
+with tab2:
+    if not st.session_state.watcher_done:
+        st.markdown("""
+        <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:12px;
+                    padding:3rem;text-align:center;color:#334155;'>
+            <div style='font-size:0.95rem;margin-bottom:0.3rem;color:#475569;'>Watcher must run first</div>
+            <div style='font-size:0.8rem;'>Go to Agent 1 — Watcher and scan for policy changes</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        col_left, col_right = st.columns([1, 1.2], gap="large")
+
+        with col_left:
+            st.markdown("<div class='section-header'>Select Policy Change</div>", unsafe_allow_html=True)
+
+            pol_titles = [p["title"] for p in SAMPLE_POLICIES]
+            sel_pol_title = st.radio("", pol_titles, label_visibility="collapsed")
+            sel_pol = next(p for p in SAMPLE_POLICIES if p["title"] == sel_pol_title)
+
+            st.markdown(f"""
+            <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                        padding:1rem;margin-top:0.5rem;'>
+                <div style='font-size:0.72rem;color:#475569;text-transform:uppercase;
+                            letter-spacing:0.1em;margin-bottom:0.5rem;'>Policy summary</div>
+                <div style='font-size:0.83rem;color:#E2E8F0;margin-bottom:0.4rem;font-weight:500;'>
+                    {sel_pol["title"]}
+                </div>
+                <div style='font-size:0.78rem;color:#94A3B8;line-height:1.5;'>
+                    {sel_pol["action"]}
+                </div>
+                <div style='margin-top:0.6rem;font-size:0.75rem;'>
+                    {''.join(f"<span style='background:#1E293B;border-radius:4px;padding:2px 8px;font-family:DM Mono,monospace;font-size:0.72rem;color:#38BDF8;margin-right:5px;'>{c}</span>" for c in sel_pol['codes'])}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+            st.markdown("<div class='section-header'>Upload Claims Data</div>", unsafe_allow_html=True)
+
+            st.markdown("""
+            <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:8px;
+                        padding:0.9rem;text-align:center;font-size:0.8rem;color:#475569;
+                        margin-bottom:0.6rem;'>
+                MASTER_healthcare_compliance_cleaned.xlsx
+                <div style='color:#22C55E;font-size:0.72rem;margin-top:2px;'>✓ 2,000 claims loaded</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            analyse_btn = st.button("Analyse claims with Claude AI", use_container_width=True)
+            if analyse_btn:
+                with st.spinner(""):
+                    prog2 = st.progress(0)
+                    steps2 = [
+                        ("Scanning 2,000 claims for matching codes...", 0.2),
+                        ("Claude AI reading policy + claim details...", 0.45),
+                        ("XGBoost scoring rejection probability...", 0.65),
+                        ("Calculating financial exposure...", 0.85),
+                        ("Ranking by risk level...", 1.0),
+                    ]
+                    sp = st.empty()
+                    for msg, pct in steps2:
+                        sp.markdown(f"<div style='font-size:0.8rem;color:#F59E0B;font-family:DM Mono,monospace;'>{msg}</div>", unsafe_allow_html=True)
+                        prog2.progress(pct)
+                        time.sleep(0.4)
+                    sp.empty(); prog2.empty()
+                st.session_state.thinker_done = True
+                st.rerun()
+
+        with col_right:
+            st.markdown("<div class='section-header'>Flagged Claims</div>", unsafe_allow_html=True)
+
+            if not st.session_state.thinker_done:
+                st.markdown("""
+                <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:10px;
+                            padding:2.5rem;text-align:center;color:#334155;'>
+                    <div style='font-size:0.85rem;'>Run analysis to flag at-risk claims</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                # Summary row
+                high_c = sum(1 for c in SAMPLE_CLAIMS if c["risk"]=="HIGH")
+                med_c  = sum(1 for c in SAMPLE_CLAIMS if c["risk"]=="MEDIUM")
+                total_risk = sum(c["billed"] for c in SAMPLE_CLAIMS if c["risk"] in ["HIGH","MEDIUM"])
+
+                r1,r2,r3 = st.columns(3)
+                for col_r, val, lbl, color in [
+                    (r1, str(high_c), "HIGH risk", "#F87171"),
+                    (r2, str(med_c),  "MEDIUM risk", "#FBBF24"),
+                    (r3, f"${total_risk:,.0f}", "Total exposure", "#34D399")
+                ]:
+                    col_r.markdown(f"""
+                    <div class='metric-card' style='padding:0.7rem;'>
+                        <div class='metric-val' style='color:{color};font-size:1.4rem;'>{val}</div>
+                        <div class='metric-lbl'>{lbl}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+
+                for claim in SAMPLE_CLAIMS:
+                    badge_cls = {"HIGH":"badge-high","MEDIUM":"badge-medium","LOW":"badge-low"}
+                    stat_cls  = {"DENIED":"badge-denied","APPROVED":"badge-approved"}
+                    color_map = {"HIGH":"#F87171","MEDIUM":"#FBBF24","LOW":"#34D399"}
+                    bc = color_map[claim["risk"]]
+
+                    st.markdown(f"""
+                    <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                                padding:0.85rem 1rem;margin-bottom:0.45rem;
+                                border-left:3px solid {bc};'>
+                        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;'>
+                            <div style='display:flex;align-items:center;gap:8px;'>
+                                <span style='font-family:DM Mono,monospace;font-size:0.78rem;color:#38BDF8;'>
+                                    {claim["claim_id"]}
+                                </span>
+                                <span style='font-size:0.75rem;color:#64748B;'>· {claim["patient_id"]}</span>
+                            </div>
+                            <div style='display:flex;gap:6px;'>
+                                <span class='badge {stat_cls[claim["status"]]}'>{claim["status"]}</span>
+                                <span class='badge {badge_cls[claim["risk"]]}'>{claim["risk"]}</span>
+                            </div>
+                        </div>
+                        <div style='display:flex;gap:1.5rem;font-size:0.75rem;color:#64748B;'>
+                            <span style='color:#94A3B8;font-family:DM Mono,monospace;'>{claim["cpt_code"]}</span>
+                            <span>{claim["provider"]}</span>
+                            <span>{claim["payer"]}</span>
+                            <span style='color:#E2E8F0;font-weight:500;'>${claim["billed"]:,.2f}</span>
+                        </div>
+                        {f'<div style="margin-top:0.3rem;font-size:0.72rem;color:#F87171;">{claim["denial_reason"]}</div>' if claim["denial_reason"] != "N/A" else ''}
+                    </div>
+                    """, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════════
+# TAB 3 — FIXER
+# ════════════════════════════════════════════════════════════════
+with tab3:
+    if not st.session_state.thinker_done:
+        st.markdown("""
+        <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:12px;
+                    padding:3rem;text-align:center;color:#334155;'>
+            <div style='font-size:0.95rem;margin-bottom:0.3rem;color:#475569;'>Thinker must run first</div>
+            <div style='font-size:0.8rem;'>Go to Agent 2 — Thinker and analyse claims</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        col_left, col_right = st.columns([1, 1.3], gap="large")
+
+        with col_left:
+            st.markdown("<div class='section-header'>Select Claim to Fix</div>", unsafe_allow_html=True)
+
+            fixable = [c for c in SAMPLE_CLAIMS if c["claim_id"] in FIXER_OUTPUTS]
+            claim_labels = [f"{c['claim_id']}  ·  {c['cpt_code']}  ·  {c['risk']}" for c in fixable]
+            sel_label = st.radio("", claim_labels, label_visibility="collapsed")
+            sel_idx   = claim_labels.index(sel_label)
+            sel_claim = fixable[sel_idx]
+
+            # Claim detail card
+            bc = {"HIGH":"#F87171","MEDIUM":"#FBBF24","LOW":"#34D399"}[sel_claim["risk"]]
+            st.markdown(f"""
+            <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                        padding:1rem;margin-top:0.5rem;border-left:3px solid {bc};'>
+                <div style='font-size:0.72rem;color:#475569;text-transform:uppercase;
+                            letter-spacing:0.1em;margin-bottom:0.5rem;'>Claim details</div>
+                <div style='display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;font-size:0.8rem;'>
+                    <div style='color:#64748B;'>Claim ID</div>
+                    <div style='color:#38BDF8;font-family:DM Mono,monospace;'>{sel_claim["claim_id"]}</div>
+                    <div style='color:#64748B;'>Patient</div>
+                    <div style='color:#E2E8F0;'>{sel_claim["patient_id"]}</div>
+                    <div style='color:#64748B;'>CPT Code</div>
+                    <div style='color:#38BDF8;font-family:DM Mono,monospace;'>{sel_claim["cpt_code"]}</div>
+                    <div style='color:#64748B;'>Payer</div>
+                    <div style='color:#E2E8F0;'>{sel_claim["payer"]}</div>
+                    <div style='color:#64748B;'>Billed</div>
+                    <div style='color:#34D399;font-weight:600;'>${sel_claim["billed"]:,.2f}</div>
+                    <div style='color:#64748B;'>Status</div>
+                    <div style='color:#F87171;'>{sel_claim["status"]}</div>
+                </div>
+                {f'<div style="margin-top:0.6rem;padding:0.4rem 0.6rem;background:#1A0A0A;border-radius:6px;font-size:0.75rem;color:#FCA5A5;">⚠ {sel_claim["denial_reason"]}</div>' if sel_claim["denial_reason"] != "N/A" else ''}
+            </div>
+            """, unsafe_allow_html=True)
+
+            st.markdown("<div style='height:0.6rem;'></div>", unsafe_allow_html=True)
+            fix_btn = st.button("Generate fix with Claude AI", use_container_width=True)
+            if fix_btn:
+                with st.spinner(""):
+                    prog3 = st.progress(0)
+                    steps3 = [
+                        ("Reading claim details...", 0.2),
+                        ("Claude cross-referencing policy requirement...", 0.45),
+                        ("Identifying documentation gaps...", 0.65),
+                        ("Generating corrective checklist...", 0.85),
+                        ("Setting deadline countdown...", 1.0),
+                    ]
+                    sp3 = st.empty()
+                    for msg, pct in steps3:
+                        sp3.markdown(f"<div style='font-size:0.8rem;color:#34D399;font-family:DM Mono,monospace;'>{msg}</div>", unsafe_allow_html=True)
+                        prog3.progress(pct)
+                        time.sleep(0.4)
+                    sp3.empty(); prog3.empty()
+                st.session_state.fixer_done    = True
+                st.session_state.selected_claim = sel_claim["claim_id"]
+                st.rerun()
+
+        with col_right:
+            st.markdown("<div class='section-header'>Claude AI — Corrective Action Plan</div>", unsafe_allow_html=True)
+
+            if not st.session_state.fixer_done:
+                st.markdown("""
+                <div style='background:#0F172A;border:1px dashed #1E293B;border-radius:10px;
+                            padding:2.5rem;text-align:center;color:#334155;'>
+                    <div style='font-size:0.85rem;'>Select a claim and generate fix</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                cid   = st.session_state.selected_claim
+                steps = FIXER_OUTPUTS.get(cid, FIXER_OUTPUTS["CLM000001"])
+
+                st.markdown("""
+                <div style='background:#0A2818;border:1px solid #166534;border-radius:10px;
+                            padding:0.6rem 1rem;font-size:0.78rem;color:#86EFAC;
+                            font-family:DM Mono,monospace;margin-bottom:0.8rem;'>
+                    ✓ Claude AI — corrective action plan generated
+                </div>
+                """, unsafe_allow_html=True)
+
+                steps_html = "".join([
+                    f"""<div style='display:flex;gap:10px;align-items:flex-start;
+                                    padding:0.6rem 0;border-bottom:1px solid #0A2818;'>
+                            <span style='min-width:22px;height:22px;background:#166534;border-radius:50%;
+                                         display:flex;align-items:center;justify-content:center;
+                                         font-size:0.68rem;font-weight:700;color:#86EFAC;
+                                         font-family:DM Mono,monospace;flex-shrink:0;'>{i+1}</span>
+                            <span style='font-size:0.82rem;color:#BBF7D0;line-height:1.5;'>{step}</span>
+                        </div>"""
+                    for i, step in enumerate(steps)
+                ])
+
+                st.markdown(f"""
+                <div style='background:#071A10;border:1px solid #166534;border-radius:12px;
+                            padding:1rem 1.1rem;'>
+                    {steps_html}
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Impact summary
+                st.markdown("<div style='height:0.7rem;'></div>", unsafe_allow_html=True)
+                st.markdown("<div class='section-header'>Outcome</div>", unsafe_allow_html=True)
+
+                oc1, oc2, oc3 = st.columns(3)
+                for col_o, val, lbl, color in [
+                    (oc1, "30 days",  "Fix deadline",        "#FBBF24"),
+                    (oc2, "Prevented","Claim rejection",      "#34D399"),
+                    (oc3, f"${sel_claim['billed']:,.0f}", "Revenue saved", "#34D399")
+                ]:
+                    col_o.markdown(f"""
+                    <div class='metric-card' style='padding:0.7rem;'>
+                        <div class='metric-val' style='color:{color};font-size:1.3rem;'>{val}</div>
+                        <div class='metric-lbl'>{lbl}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.markdown("""
+                <div style='background:#0F172A;border:1px solid #1E293B;border-radius:10px;
+                            padding:0.9rem 1rem;margin-top:0.8rem;font-size:0.82rem;
+                            color:#64748B;line-height:1.6;'>
+                    <span style='color:#38BDF8;font-weight:500;'>Next step:</span>
+                    Share this action plan with the billing team. Once all steps are completed,
+                    resubmit the claim through your practice management system.
+                    The denial column will stay empty. Revenue is protected.
+                </div>
+                """, unsafe_allow_html=True)
+
+# ─── FOOTER ─────────────────────────────────────────────────────
+st.markdown("""
+<hr style='border-color:#1E293B;margin-top:2rem;'>
+<div style='display:flex;justify-content:space-between;font-size:0.72rem;color:#334155;padding-bottom:0.5rem;'>
+    <span>HealthGuard AI · Healthcare Compliance Agent · Datathon 2K26 · CIT Coimbatore</span>
+    <span>Powered by Claude API · XGBoost · Streamlit</span>
+</div>
+""", unsafe_allow_html=True)
